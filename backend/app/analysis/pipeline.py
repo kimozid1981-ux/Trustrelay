@@ -8,7 +8,14 @@ import logging
 from app.analysis import scoring
 from app.analysis.brands import BRANDS_BY_ID
 from app.analysis.deps import EngineDeps
-from app.analysis.extract import extract_emails, extract_ibans, extract_phones, extract_urls, mask_iban, normalize_text
+from app.analysis.extract import (
+    extract_emails,
+    extract_ibans,
+    extract_phones,
+    extract_urls,
+    mask_iban,
+    normalize_text,
+)
 from app.analysis.modules import qr, text_modules, website
 from app.analysis.types import (
     AnalysisContext,

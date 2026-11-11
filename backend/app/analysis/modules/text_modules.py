@@ -41,9 +41,23 @@ async def run_advert(ctx: AnalysisContext, deps: EngineDeps) -> None:
         if pct > best:
             best, excerpt = pct, m.group(0)
     if best >= 90:
-        ctx.add(Finding("advert", "ad_extreme_discount", Severity.STRONG, Confidence.MEDIUM, "rules:advert", [excerpt], {"percent": best}))
+        ctx.add(
+            Finding(
+                "advert", "ad_extreme_discount", Severity.STRONG, Confidence.MEDIUM, "rules:advert", [excerpt], {"percent": best}
+            )
+        )
     elif best >= 70:
-        ctx.add(Finding("advert", "ad_extreme_discount", Severity.MODERATE, Confidence.MEDIUM, "rules:advert", [excerpt], {"percent": best}))
+        ctx.add(
+            Finding(
+                "advert",
+                "ad_extreme_discount",
+                Severity.MODERATE,
+                Confidence.MEDIUM,
+                "rules:advert",
+                [excerpt],
+                {"percent": best},
+            )
+        )
 
 
 async def run_payment(ctx: AnalysisContext, deps: EngineDeps) -> None:
@@ -57,11 +71,32 @@ async def run_payment(ctx: AnalysisContext, deps: EngineDeps) -> None:
             ctx.add(Finding("payment", "iban_invalid_checksum", Severity.MODERATE, Confidence.HIGH, "rules:iban", [masked]))
             continue
         country = iban[:2]
-        ctx.add(Finding("payment", "beneficiary_not_verifiable", Severity.INFO, Confidence.HIGH, "rules:iban", [masked], {"country": country}))
-        domestic_claims = [b for b in claimed if b.country == "FR" and b.category in ("public", "bank", "energy", "telecom", "parcel")]
+        ctx.add(
+            Finding(
+                "payment",
+                "beneficiary_not_verifiable",
+                Severity.INFO,
+                Confidence.HIGH,
+                "rules:iban",
+                [masked],
+                {"country": country},
+            )
+        )
+        domestic_claims = [
+            b for b in claimed if b.country == "FR" and b.category in ("public", "bank", "energy", "telecom", "parcel")
+        ]
         if domestic_claims and country != "FR":
-            ctx.add(Finding("payment", "iban_country_mismatch", Severity.MODERATE, Confidence.MEDIUM, "rules:iban", [masked],
-                            {"country": country, "brand": domestic_claims[0].name}))
+            ctx.add(
+                Finding(
+                    "payment",
+                    "iban_country_mismatch",
+                    Severity.MODERATE,
+                    Confidence.MEDIUM,
+                    "rules:iban",
+                    [masked],
+                    {"country": country, "brand": domestic_claims[0].name},
+                )
+            )
     if ctx.ibans:
         ctx.add_missing("beneficiary_identity_unverified")
 
@@ -81,7 +116,15 @@ async def correlate(ctx: AnalysisContext, deps: EngineDeps) -> None:
         if brand_for_registrable_domain(p.registrable) is not None:
             continue  # links to an official domain of some known organisation
         brand = BRANDS_BY_ID[ctx.claimed_brands[0]]
-        ctx.add(Finding("correlation", "impersonation_link_mismatch", Severity.MODERATE, Confidence.MEDIUM,
-                        "rules:brand_registry", [brand.name, p.host],
-                        {"brand": brand.name, "domain": p.registrable, "official": ", ".join(brand.official_domains[:3])}))
+        ctx.add(
+            Finding(
+                "correlation",
+                "impersonation_link_mismatch",
+                Severity.MODERATE,
+                Confidence.MEDIUM,
+                "rules:brand_registry",
+                [brand.name, p.host],
+                {"brand": brand.name, "domain": p.registrable, "official": ", ".join(brand.official_domains[:3])},
+            )
+        )
         return

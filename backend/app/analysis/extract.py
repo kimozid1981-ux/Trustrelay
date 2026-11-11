@@ -27,21 +27,56 @@ _BARE_DOMAIN_RE = re.compile(
 )
 _EMAIL_RE = re.compile(r"(?i)\b[a-z0-9._%+-]{1,64}@([a-z0-9-]+\.)+[a-z]{2,24}\b")
 _IBAN_RE = re.compile(r"\b([A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?)\b")
-_PHONE_RE = re.compile(r"(?<!\d)(?:\+33\s?|0033\s?|0)[1-9](?:[\s.-]?\d{2}){4}(?!\d)|(?<!\d)\+\d{1,3}(?:[\s.-]?\d{2,4}){3,5}(?!\d)")
+_PHONE_RE = re.compile(
+    r"(?<!\d)(?:\+33\s?|0033\s?|0)[1-9](?:[\s.-]?\d{2}){4}(?!\d)|(?<!\d)\+\d{1,3}(?:[\s.-]?\d{2,4}){3,5}(?!\d)"
+)
 _TRAILING = ".,;:!?)]}>'\"»"
 
 IBAN_LENGTHS = {
-    "FR": 27, "DE": 22, "BE": 16, "ES": 24, "IT": 27, "NL": 18, "LU": 20, "PT": 25, "IE": 22, "GB": 22,
-    "CH": 21, "AT": 20, "LT": 20, "PL": 28, "MC": 27, "CY": 28, "MT": 31, "EE": 20, "LV": 21, "FI": 18,
-    "GR": 27, "SE": 24, "DK": 18, "NO": 15, "CZ": 24, "SK": 24, "HR": 21, "SI": 19, "RO": 24, "BG": 22,
-    "HU": 28, "TR": 26, "AE": 23, "MA": 28, "TN": 24, "SN": 28, "CI": 28,
+    "FR": 27,
+    "DE": 22,
+    "BE": 16,
+    "ES": 24,
+    "IT": 27,
+    "NL": 18,
+    "LU": 20,
+    "PT": 25,
+    "IE": 22,
+    "GB": 22,
+    "CH": 21,
+    "AT": 20,
+    "LT": 20,
+    "PL": 28,
+    "MC": 27,
+    "CY": 28,
+    "MT": 31,
+    "EE": 20,
+    "LV": 21,
+    "FI": 18,
+    "GR": 27,
+    "SE": 24,
+    "DK": 18,
+    "NO": 15,
+    "CZ": 24,
+    "SK": 24,
+    "HR": 21,
+    "SI": 19,
+    "RO": 24,
+    "BG": 22,
+    "HU": 28,
+    "TR": 26,
+    "AE": 23,
+    "MA": 28,
+    "TN": 24,
+    "SN": 28,
+    "CI": 28,
 }
 
 
 def normalize_text(text: str) -> str:
     text = unicodedata.normalize("NFC", text)
     # remove zero-width and bidi control characters often used to evade filters
-    text = re.sub(r"[​-‏‪-‮⁠-⁤﻿]", "", text)
+    text = re.sub("[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]", "", text)
     for pattern, repl in _DEFANG:
         text = pattern.sub(repl, text)
     return text

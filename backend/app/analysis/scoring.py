@@ -22,8 +22,14 @@ from app.analysis.types import AnalysisContext, Confidence, Finding, Severity, V
 MIN_TEXT_CHARS = 20
 
 PAYMENT_CODES = {
-    "pay_off_platform", "pay_changed_bank_details", "pay_friends_and_family", "msg_payment_gift_card_or_voucher",
-    "msg_payment_crypto", "msg_safe_account_scam", "iban_country_mismatch", "qr_crypto_payment",
+    "pay_off_platform",
+    "pay_changed_bank_details",
+    "pay_friends_and_family",
+    "msg_payment_gift_card_or_voucher",
+    "msg_payment_crypto",
+    "msg_safe_account_scam",
+    "iban_country_mismatch",
+    "qr_crypto_payment",
 }
 SECRET_CODES = {"msg_requests_auth_code", "msg_requests_password", "msg_requests_card_details", "qr_authenticator_setup"}
 

@@ -355,13 +355,48 @@ FINDINGS: dict[str, tuple[str, str, str, str]] = {
         "Le QR code contient du texte",
         "Le texte a été analysé comme un message.",
     ),
-    "ai_phishing_language": ("AI-assessed: phishing-style wording", "An AI model flagged this wording. AI signals can be wrong.", "Évaluation IA : formulation de type hameçonnage", "Un modèle d'IA a relevé cette formulation. Les signaux IA peuvent se tromper."),
-    "ai_impersonation": ("AI-assessed: possible impersonation", "An AI model flagged this. AI signals can be wrong.", "Évaluation IA : possible usurpation d'identité", "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper."),
-    "ai_urgency_pressure": ("AI-assessed: pressure to act", "An AI model flagged this. AI signals can be wrong.", "Évaluation IA : pression pour agir", "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper."),
-    "ai_sensitive_data_request": ("AI-assessed: request for sensitive information", "An AI model flagged this. AI signals can be wrong.", "Évaluation IA : demande d'informations sensibles", "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper."),
-    "ai_unusual_payment_request": ("AI-assessed: unusual payment request", "An AI model flagged this. AI signals can be wrong.", "Évaluation IA : demande de paiement inhabituelle", "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper."),
-    "ai_too_good_to_be_true": ("AI-assessed: offer too good to be true", "An AI model flagged this. AI signals can be wrong.", "Évaluation IA : offre trop belle pour être vraie", "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper."),
-    "ai_fake_endorsement": ("AI-assessed: possibly fake endorsement", "An AI model flagged this. AI signals can be wrong.", "Évaluation IA : soutien possiblement faux", "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper."),
+    "ai_phishing_language": (
+        "AI-assessed: phishing-style wording",
+        "An AI model flagged this wording. AI signals can be wrong.",
+        "Évaluation IA : formulation de type hameçonnage",
+        "Un modèle d'IA a relevé cette formulation. Les signaux IA peuvent se tromper.",
+    ),
+    "ai_impersonation": (
+        "AI-assessed: possible impersonation",
+        "An AI model flagged this. AI signals can be wrong.",
+        "Évaluation IA : possible usurpation d'identité",
+        "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper.",
+    ),
+    "ai_urgency_pressure": (
+        "AI-assessed: pressure to act",
+        "An AI model flagged this. AI signals can be wrong.",
+        "Évaluation IA : pression pour agir",
+        "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper.",
+    ),
+    "ai_sensitive_data_request": (
+        "AI-assessed: request for sensitive information",
+        "An AI model flagged this. AI signals can be wrong.",
+        "Évaluation IA : demande d'informations sensibles",
+        "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper.",
+    ),
+    "ai_unusual_payment_request": (
+        "AI-assessed: unusual payment request",
+        "An AI model flagged this. AI signals can be wrong.",
+        "Évaluation IA : demande de paiement inhabituelle",
+        "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper.",
+    ),
+    "ai_too_good_to_be_true": (
+        "AI-assessed: offer too good to be true",
+        "An AI model flagged this. AI signals can be wrong.",
+        "Évaluation IA : offre trop belle pour être vraie",
+        "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper.",
+    ),
+    "ai_fake_endorsement": (
+        "AI-assessed: possibly fake endorsement",
+        "An AI model flagged this. AI signals can be wrong.",
+        "Évaluation IA : soutien possiblement faux",
+        "Un modèle d'IA l'a relevé. Les signaux IA peuvent se tromper.",
+    ),
 }
 
 # Limitations by source family: (en, fr)
@@ -465,18 +500,42 @@ ACTIONS: dict[str, tuple[str, str]] = {
 }
 
 MISSING: dict[str, tuple[str, str]] = {
-    "no_reputation_source": ("No independent threat-intelligence source could check the link.", "Aucune source indépendante de cybersécurité n'a pu vérifier le lien."),
-    "links_not_checked_by_reputation_source": ("Links could not be checked against threat lists.", "Les liens n'ont pas pu être comparés aux listes de menaces."),
+    "no_reputation_source": (
+        "No independent threat-intelligence source could check the link.",
+        "Aucune source indépendante de cybersécurité n'a pu vérifier le lien.",
+    ),
+    "links_not_checked_by_reputation_source": (
+        "Links could not be checked against threat lists.",
+        "Les liens n'ont pas pu être comparés aux listes de menaces.",
+    ),
     "domain_age_unavailable": ("Domain registration date unavailable.", "Date de création du domaine indisponible."),
-    "redirects_not_resolved": ("We did not follow the link to its final destination.", "Nous n'avons pas suivi le lien jusqu'à sa destination finale."),
-    "shortened_link_not_resolved": ("The real destination of the shortened link is unknown.", "La vraie destination du lien raccourci est inconnue."),
-    "certificate_not_checked": ("The site's security certificate was not checked.", "Le certificat de sécurité du site n'a pas été vérifié."),
+    "redirects_not_resolved": (
+        "We did not follow the link to its final destination.",
+        "Nous n'avons pas suivi le lien jusqu'à sa destination finale.",
+    ),
+    "shortened_link_not_resolved": (
+        "The real destination of the shortened link is unknown.",
+        "La vraie destination du lien raccourci est inconnue.",
+    ),
+    "certificate_not_checked": (
+        "The site's security certificate was not checked.",
+        "Le certificat de sécurité du site n'a pas été vérifié.",
+    ),
     "image_text_not_extracted": ("We could not read text from the image.", "Nous n'avons pas pu lire le texte de l'image."),
-    "ai_disabled": ("AI reading is turned off, so the image could not be read.", "La lecture par IA est désactivée ; l'image n'a pas pu être lue."),
+    "ai_disabled": (
+        "AI reading is turned off, so the image could not be read.",
+        "La lecture par IA est désactivée ; l'image n'a pas pu être lue.",
+    ),
     "qr_not_decoded": ("No QR code could be read.", "Aucun QR code n'a pu être lu."),
-    "url_not_parseable": ("The address could not be understood as a web link.", "L'adresse n'a pas pu être interprétée comme un lien web."),
+    "url_not_parseable": (
+        "The address could not be understood as a web link.",
+        "L'adresse n'a pas pu être interprétée comme un lien web.",
+    ),
     "nothing_analysable": ("There was not enough content to analyse.", "Le contenu était insuffisant pour être analysé."),
-    "beneficiary_identity_unverified": ("The identity of the account holder is unknown to us.", "L'identité du titulaire du compte nous est inconnue."),
+    "beneficiary_identity_unverified": (
+        "The identity of the account holder is unknown to us.",
+        "L'identité du titulaire du compte nous est inconnue.",
+    ),
 }
 
 CONFIDENCE: dict[str, tuple[str, str]] = {

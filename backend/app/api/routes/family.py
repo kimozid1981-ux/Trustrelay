@@ -46,8 +46,13 @@ class CreateIn(BaseModel):
 
 
 @router.post("", status_code=201)
-async def create_group(body: CreateIn, request: Request, p: Principal = Depends(current_principal),
-                       db: AsyncSession = Depends(get_db), lang: str = Depends(language)) -> dict:
+async def create_group(
+    body: CreateIn,
+    request: Request,
+    p: Principal = Depends(current_principal),
+    db: AsyncSession = Depends(get_db),
+    lang: str = Depends(language),
+) -> dict:
     if await _membership(db, p.id):
         raise ApiError(409, "already_in_family", "You already belong to a family group")
     g = FamilyGroup(id=uuid.uuid4(), name=body.name.strip(), owner_id=p.id)
@@ -60,8 +65,9 @@ async def create_group(body: CreateIn, request: Request, p: Principal = Depends(
 
 
 @router.get("")
-async def get_group(p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db),
-                    lang: str = Depends(language)) -> dict:
+async def get_group(
+    p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db), lang: str = Depends(language)
+) -> dict:
     m = await _membership(db, p.id)
     if m is None:
         return {"group": None}
@@ -69,29 +75,49 @@ async def get_group(p: Principal = Depends(current_principal), db: AsyncSession 
     assert g is not None
     await db.refresh(g, ["members"])
     users = {u.id: u for u in (await db.execute(select(User).where(User.id.in_([x.user_id for x in g.members])))).scalars()}
-    members = [{
-        "user_id": str(x.user_id),
-        "display_name": users[x.user_id].display_name or "—",
-        "role": x.role, "age_band": x.age_band,
-        "receive_warnings": x.receive_warnings, "can_share_warnings": x.can_share_warnings,
-        "is_me": x.user_id == p.id,
-    } for x in g.members]
+    members = [
+        {
+            "user_id": str(x.user_id),
+            "display_name": users[x.user_id].display_name or "—",
+            "role": x.role,
+            "age_band": x.age_band,
+            "receive_warnings": x.receive_warnings,
+            "can_share_warnings": x.can_share_warnings,
+            "is_me": x.user_id == p.id,
+        }
+        for x in g.members
+    ]
     warnings = []
     if m.receive_warnings:
-        rows = (await db.execute(select(SharedWarning).where(SharedWarning.group_id == g.id)
-                                 .order_by(SharedWarning.created_at.desc()).limit(50))).scalars().all()
+        rows = (
+            (
+                await db.execute(
+                    select(SharedWarning)
+                    .where(SharedWarning.group_id == g.id)
+                    .order_by(SharedWarning.created_at.desc())
+                    .limit(50)
+                )
+            )
+            .scalars()
+            .all()
+        )
         simple = m.age_band in ("child", "teen")
         kr = get_keyring()
         for w in rows:
             v = catalog.render_verdict(w.verdict, lang, simple=simple)
-            warnings.append({
-                "id": str(w.id),
-                "shared_by": users[w.shared_by].display_name if w.shared_by in users else None,
-                "kind": w.kind, "verdict": w.verdict, "verdict_title": v["title"], "verdict_summary": v["summary"],
-                "signals": [catalog.render_finding(c, "rules", {}, lang)["title"] for c in w.finding_codes],
-                "message": kr.decrypt_text(w.message_enc, f"warning:{w.id}".encode()) if w.message_enc else None,
-                "created_at": w.created_at.isoformat(),
-            })
+            warnings.append(
+                {
+                    "id": str(w.id),
+                    "shared_by": users[w.shared_by].display_name if w.shared_by in users else None,
+                    "kind": w.kind,
+                    "verdict": w.verdict,
+                    "verdict_title": v["title"],
+                    "verdict_summary": v["summary"],
+                    "signals": [catalog.render_finding(c, "rules", {}, lang)["title"] for c in w.finding_codes],
+                    "message": kr.decrypt_text(w.message_enc, f"warning:{w.id}".encode()) if w.message_enc else None,
+                    "created_at": w.created_at.isoformat(),
+                }
+            )
     return {"group": {"id": str(g.id), "name": g.name, "my_role": m.role, "members": members}, "warnings": warnings}
 
 
@@ -101,17 +127,32 @@ class InviteIn(BaseModel):
 
 
 @router.post("/invites", status_code=201)
-async def invite(body: InviteIn, request: Request, p: Principal = Depends(current_principal),
-                 db: AsyncSession = Depends(get_db)) -> dict:
+async def invite(
+    body: InviteIn, request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> dict:
     m = await _membership(db, p.id)
     if m is None or not _can_manage(m):
         raise ApiError(403, "forbidden", "Only the family owner or a guardian can invite members")
     code = "-".join(secrets.token_hex(2).upper() for _ in range(3))  # e.g. 4F2A-91C0-7B3E, shown once
-    inv = FamilyInvite(group_id=m.group_id, code_hash=hash_refresh_token(code), role=body.role, age_band=body.age_band,
-                       created_by=p.id, expires_at=datetime.now(UTC) + timedelta(days=7))
+    inv = FamilyInvite(
+        group_id=m.group_id,
+        code_hash=hash_refresh_token(code),
+        role=body.role,
+        age_band=body.age_band,
+        created_by=p.id,
+        expires_at=datetime.now(UTC) + timedelta(days=7),
+    )
     db.add(inv)
-    await audit(db, category="data", action="family.invite", actor_id=p.id, target_type="family", target_id=m.group_id,
-                request=request, details={"role": body.role, "age_band": body.age_band})
+    await audit(
+        db,
+        category="data",
+        action="family.invite",
+        actor_id=p.id,
+        target_type="family",
+        target_id=m.group_id,
+        request=request,
+        details={"role": body.role, "age_band": body.age_band},
+    )
     await db.commit()
     return {"code": code, "expires_at": inv.expires_at.isoformat()}
 
@@ -121,8 +162,14 @@ class JoinIn(BaseModel):
 
 
 @router.post("/join")
-async def join(body: JoinIn, request: Request, p: Principal = Depends(current_principal), _: None = Depends(_join_rl),
-               db: AsyncSession = Depends(get_db), lang: str = Depends(language)) -> dict:
+async def join(
+    body: JoinIn,
+    request: Request,
+    p: Principal = Depends(current_principal),
+    _: None = Depends(_join_rl),
+    db: AsyncSession = Depends(get_db),
+    lang: str = Depends(language),
+) -> dict:
     if await _membership(db, p.id):
         raise ApiError(409, "already_in_family", "You already belong to a family group")
     code = body.code.strip().upper()
@@ -133,9 +180,14 @@ async def join(body: JoinIn, request: Request, p: Principal = Depends(current_pr
         raise ApiError(404, "invalid_invite", "This invitation code is invalid or has expired")
     inv.accepted_at = datetime.now(UTC)
     # Children do not share by default; they still receive age-appropriate warnings.
-    db.add(FamilyMember(group_id=inv.group_id, user_id=p.id, role=inv.role, age_band=inv.age_band,
-                        can_share_warnings=inv.age_band != "child"))
-    await audit(db, category="data", action="family.join", actor_id=p.id, target_type="family", target_id=inv.group_id, request=request)
+    db.add(
+        FamilyMember(
+            group_id=inv.group_id, user_id=p.id, role=inv.role, age_band=inv.age_band, can_share_warnings=inv.age_band != "child"
+        )
+    )
+    await audit(
+        db, category="data", action="family.join", actor_id=p.id, target_type="family", target_id=inv.group_id, request=request
+    )
     await db.commit()
     return await get_group(p, db, lang)
 
@@ -148,8 +200,14 @@ class MemberPatch(BaseModel):
 
 
 @router.patch("/members/{user_id}")
-async def update_member(user_id: uuid.UUID, body: MemberPatch, request: Request, p: Principal = Depends(current_principal),
-                        db: AsyncSession = Depends(get_db), lang: str = Depends(language)) -> dict:
+async def update_member(
+    user_id: uuid.UUID,
+    body: MemberPatch,
+    request: Request,
+    p: Principal = Depends(current_principal),
+    db: AsyncSession = Depends(get_db),
+    lang: str = Depends(language),
+) -> dict:
     me = await _membership(db, p.id)
     target = await _membership(db, user_id)
     if me is None or target is None or me.group_id != target.group_id:
@@ -167,15 +225,24 @@ async def update_member(user_id: uuid.UUID, body: MemberPatch, request: Request,
         raise ApiError(409, "owner_role_fixed", "Transfer ownership is not supported yet")
     for k, v in changes.items():
         setattr(target, k, v)
-    await audit(db, category="data", action="family.member_update", actor_id=p.id, target_type="user", target_id=user_id,
-                request=request, details={"fields": sorted(changes)})
+    await audit(
+        db,
+        category="data",
+        action="family.member_update",
+        actor_id=p.id,
+        target_type="user",
+        target_id=user_id,
+        request=request,
+        details={"fields": sorted(changes)},
+    )
     await db.commit()
     return await get_group(p, db, lang)
 
 
 @router.delete("/members/{user_id}", status_code=204)
-async def remove_member(user_id: uuid.UUID, request: Request, p: Principal = Depends(current_principal),
-                        db: AsyncSession = Depends(get_db)) -> Response:
+async def remove_member(
+    user_id: uuid.UUID, request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> Response:
     me = await _membership(db, p.id)
     target = await _membership(db, user_id)
     if me is None or target is None or me.group_id != target.group_id:
@@ -189,7 +256,8 @@ async def remove_member(user_id: uuid.UUID, request: Request, p: Principal = Dep
         await db.delete(g)  # owner leaving dissolves the group
     else:
         await db.delete(target)
-    await audit(db, category="data", action="family.member_remove", actor_id=p.id, target_type="user", target_id=user_id,
-                request=request)
+    await audit(
+        db, category="data", action="family.member_remove", actor_id=p.id, target_type="user", target_id=user_id, request=request
+    )
     await db.commit()
     return Response(status_code=204)

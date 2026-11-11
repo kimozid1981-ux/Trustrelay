@@ -95,9 +95,7 @@ class User(Base):
 class UserPreferences(Base):
     __tablename__ = "user_preferences"
 
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     # Days to keep analyses. 0 = delete submitted content right after analysis (result summary kept 1 day).
     retention_days: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=90)
     explanation_level: Mapped[str] = mapped_column(String(12), nullable=False, default="standard")
@@ -182,17 +180,13 @@ class Analysis(Base):
     __tablename__ = "analyses"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="queued")
     verdict: Mapped[str | None] = mapped_column(String(32))
     confidence: Mapped[str | None] = mapped_column(String(8))
     language: Mapped[str] = mapped_column(String(8), nullable=False, default="fr")
-    upload_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("uploads.id", ondelete="SET NULL")
-    )
+    upload_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("uploads.id", ondelete="SET NULL"))
     input_enc: Mapped[bytes | None] = mapped_column(LargeBinary)  # submitted text / URL
     label_enc: Mapped[bytes | None] = mapped_column(LargeBinary)  # short label for history (e.g. domain)
     result_enc: Mapped[bytes | None] = mapped_column(LargeBinary)  # extracted entities, org, missing info
@@ -251,9 +245,7 @@ class Finding(Base):
 class UsageCounter(Base):
     __tablename__ = "usage_counters"
 
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     period: Mapped[str] = mapped_column(String(7), primary_key=True)  # YYYY-MM
     checks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
@@ -263,14 +255,10 @@ class FamilyGroup(Base):
 
     id: Mapped[uuid.UUID] = _uuid_pk()
     name: Mapped[str] = mapped_column(String(80), nullable=False)
-    owner_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    owner_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at: Mapped[datetime] = _now()
 
-    members: Mapped[list[FamilyMember]] = relationship(
-        back_populates="group", cascade="all, delete-orphan", lazy="selectin"
-    )
+    members: Mapped[list[FamilyMember]] = relationship(back_populates="group", cascade="all, delete-orphan", lazy="selectin")
 
 
 class FamilyMember(Base):
@@ -279,9 +267,7 @@ class FamilyMember(Base):
     group_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("family_groups.id", ondelete="CASCADE"), primary_key=True
     )
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
     role: Mapped[str] = mapped_column(String(12), nullable=False, default="member")
     age_band: Mapped[str] = mapped_column(String(8), nullable=False, default="adult")
     receive_warnings: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -307,9 +293,7 @@ class FamilyInvite(Base):
     code_hash: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
     role: Mapped[str] = mapped_column(String(12), nullable=False, default="member")
     age_band: Mapped[str] = mapped_column(String(8), nullable=False, default="adult")
-    created_by: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    created_by: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     created_at: Mapped[datetime] = _now()
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -324,12 +308,8 @@ class SharedWarning(Base):
     group_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("family_groups.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    shared_by: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
-    )
-    analysis_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("analyses.id", ondelete="SET NULL")
-    )
+    shared_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"))
+    analysis_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("analyses.id", ondelete="SET NULL"))
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     verdict: Mapped[str] = mapped_column(String(32), nullable=False)
     finding_codes: Mapped[list[Any]] = mapped_column(JSONB, nullable=False, default=list)
@@ -343,15 +323,11 @@ class SupportAccessGrant(Base):
     __tablename__ = "support_access_grants"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
-    )
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     analysis_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("analyses.id", ondelete="CASCADE"), nullable=False
     )
-    ticket_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("support_tickets.id", ondelete="SET NULL")
-    )
+    ticket_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("support_tickets.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = _now()
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -361,9 +337,7 @@ class SupportTicket(Base):
     __tablename__ = "support_tickets"
 
     id: Mapped[uuid.UUID] = _uuid_pk()
-    user_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True
-    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), index=True)
     category: Mapped[str] = mapped_column(String(16), nullable=False)
     priority: Mapped[str] = mapped_column(String(8), nullable=False, default="normal")
     status: Mapped[str] = mapped_column(String(12), nullable=False, default="open")
@@ -375,9 +349,7 @@ class SupportTicket(Base):
     )
 
     __table_args__ = (
-        CheckConstraint(
-            "category IN ('general','technical','account','fraud','security')", name="ck_ticket_cat"
-        ),
+        CheckConstraint("category IN ('general','technical','account','fraud','security')", name="ck_ticket_cat"),
         CheckConstraint("priority IN ('low','normal','high','urgent')", name="ck_ticket_prio"),
         CheckConstraint("status IN ('open','pending','resolved','closed')", name="ck_ticket_status"),
     )

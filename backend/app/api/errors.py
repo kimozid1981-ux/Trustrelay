@@ -13,8 +13,7 @@ log = logging.getLogger("trustrelay.errors")
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, detail: str, headers: dict[str, str] | None = None,
-                 extra: dict | None = None):
+    def __init__(self, status: int, code: str, detail: str, headers: dict[str, str] | None = None, extra: dict | None = None):
         super().__init__(detail)
         self.status = status
         self.code = code
@@ -74,9 +73,13 @@ def install(app: FastAPI) -> None:
 
             async with get_sessionmaker()() as db:
                 route = request.scope.get("route")
-                db.add(ErrorEvent(route=getattr(route, "path", request.url.path)[:120],
-                                  error_type=type(exc).__name__[:120],
-                                  request_id=getattr(request.state, "request_id", None)))
+                db.add(
+                    ErrorEvent(
+                        route=getattr(route, "path", request.url.path)[:120],
+                        error_type=type(exc).__name__[:120],
+                        request_id=getattr(request.state, "request_id", None),
+                    )
+                )
                 await db.commit()
         except Exception:  # noqa: BLE001 - error recording must never mask the original error
             log.warning("could not record error event")

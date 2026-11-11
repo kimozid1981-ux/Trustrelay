@@ -62,7 +62,7 @@ class RefreshIn(BaseModel):
 
 class TokenOut(BaseModel):
     access_token: str
-    token_type: str = "bearer"
+    token_type: str = "bearer"  # noqa: S105 - OAuth token type, not a secret
     expires_in: int
     refresh_token: str | None = None
     mfa: bool
@@ -78,8 +78,16 @@ class PasswordChangeIn(BaseModel):
     new_password: str = Field(min_length=1, max_length=256)
 
 
-async def _issue(db: AsyncSession, response: Response, user: User, *, client: str, mfa: bool,
-                 user_agent: str | None, chain_id: uuid.UUID | None = None) -> TokenOut:
+async def _issue(
+    db: AsyncSession,
+    response: Response,
+    user: User,
+    *,
+    client: str,
+    mfa: bool,
+    user_agent: str | None,
+    chain_id: uuid.UUID | None = None,
+) -> TokenOut:
     s = get_settings()
     token, token_hash = new_refresh_token()
     session = AuthSession(
@@ -97,8 +105,13 @@ async def _issue(db: AsyncSession, response: Response, user: User, *, client: st
     out = TokenOut(access_token=access, expires_in=s.access_token_ttl_seconds, mfa=mfa, role=user.role)
     if client == "web":
         response.set_cookie(
-            REFRESH_COOKIE, token, httponly=True, secure=s.web_refresh_cookie_secure, samesite="strict",
-            path=f"{s.api_prefix}/auth", max_age=s.refresh_token_ttl_days * 86400,
+            REFRESH_COOKIE,
+            token,
+            httponly=True,
+            secure=s.web_refresh_cookie_secure,
+            samesite="strict",
+            path=f"{s.api_prefix}/auth",
+            max_age=s.refresh_token_ttl_days * 86400,
         )
     else:
         out.refresh_token = token
@@ -106,8 +119,13 @@ async def _issue(db: AsyncSession, response: Response, user: User, *, client: st
 
 
 @router.post("/register", response_model=TokenOut, status_code=201, dependencies=[Depends(_auth_rl)])
-async def register(body: RegisterIn, request: Request, response: Response, db: AsyncSession = Depends(get_db),
-                   user_agent: str | None = Header(default=None)) -> TokenOut:
+async def register(
+    body: RegisterIn,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    user_agent: str | None = Header(default=None),
+) -> TokenOut:
     if not body.accept_terms:
         raise ApiError(422, "terms_not_accepted", "You must accept the terms of service")
     problems = password_problems(body.password, body.email)
@@ -116,22 +134,40 @@ async def register(body: RegisterIn, request: Request, response: Response, db: A
     if await load_user_by_email(db, body.email):
         # Do not reveal whether the account exists beyond what the UI needs; generic message.
         raise ApiError(409, "registration_failed", "Unable to register with these details")
-    user = User(email=body.email.lower(), password_hash=hash_password(body.password),
-                display_name=body.display_name, locale=body.locale, role="user")
+    user = User(
+        email=body.email.lower(),
+        password_hash=hash_password(body.password),
+        display_name=body.display_name,
+        locale=body.locale,
+        role="user",
+    )
     user.preferences = UserPreferences()
     user.subscription = Subscription(plan="free")
     db.add(user)
     await db.flush()
     out = await _issue(db, response, user, client=body.client, mfa=False, user_agent=user_agent)
-    await audit(db, category="auth", action="user.register", actor_id=user.id, actor_role="user",
-                target_type="user", target_id=user.id, request=request)
+    await audit(
+        db,
+        category="auth",
+        action="user.register",
+        actor_id=user.id,
+        actor_role="user",
+        target_type="user",
+        target_id=user.id,
+        request=request,
+    )
     await db.commit()
     return out
 
 
 @router.post("/login", response_model=TokenOut, dependencies=[Depends(_auth_rl)])
-async def login(body: LoginIn, request: Request, response: Response, db: AsyncSession = Depends(get_db),
-                user_agent: str | None = Header(default=None)) -> TokenOut:
+async def login(
+    body: LoginIn,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    user_agent: str | None = Header(default=None),
+) -> TokenOut:
     s = get_settings()
     user = await load_user_by_email(db, body.email)
     now = datetime.now(UTC)
@@ -146,8 +182,9 @@ async def login(body: LoginIn, request: Request, response: Response, db: AsyncSe
             if user.failed_logins >= s.login_max_failures:
                 user.locked_until = now + timedelta(minutes=s.login_lockout_minutes)
                 user.failed_logins = 0
-        await audit(db, category="security", action="login.failed", actor_id=user.id if user else None,
-                    outcome="denied", request=request)
+        await audit(
+            db, category="security", action="login.failed", actor_id=user.id if user else None, outcome="denied", request=request
+        )
         await db.commit()
         raise ApiError(401, "invalid_credentials", "Email or password is incorrect")
 
@@ -165,8 +202,15 @@ async def login(body: LoginIn, request: Request, response: Response, db: AsyncSe
     user.locked_until = None
     user.last_login_at = now
     out = await _issue(db, response, user, client=body.client, mfa=mfa, user_agent=user_agent)
-    await audit(db, category="auth", action="login.success", actor_id=user.id, actor_role=user.role,
-                request=request, details={"mfa": mfa, "client": body.client})
+    await audit(
+        db,
+        category="auth",
+        action="login.success",
+        actor_id=user.id,
+        actor_role=user.role,
+        request=request,
+        details={"mfa": mfa, "client": body.client},
+    )
     await db.commit()
     return out
 
@@ -193,11 +237,15 @@ def _check_totp(user: User, code: str) -> bool:
 
 
 @router.post("/refresh", response_model=TokenOut, dependencies=[Depends(_auth_rl)])
-async def refresh(request: Request, response: Response, body: RefreshIn | None = None,
-                  db: AsyncSession = Depends(get_db),
-                  tr_refresh: str | None = Cookie(default=None),
-                  x_requested_with: str | None = Header(default=None),
-                  user_agent: str | None = Header(default=None)) -> TokenOut:
+async def refresh(
+    request: Request,
+    response: Response,
+    body: RefreshIn | None = None,
+    db: AsyncSession = Depends(get_db),
+    tr_refresh: str | None = Cookie(default=None),
+    x_requested_with: str | None = Header(default=None),
+    user_agent: str | None = Header(default=None),
+) -> TokenOut:
     token = body.refresh_token if body and body.refresh_token else None
     client = "mobile"
     if token is None:
@@ -212,10 +260,14 @@ async def refresh(request: Request, response: Response, body: RefreshIn | None =
         raise ApiError(401, "invalid_refresh_token", "Session expired, please sign in again")
     if session.revoked_at is not None or session.rotated_at is not None:
         # Reuse of a rotated/revoked token: assume theft and revoke the whole chain.
-        await db.execute(update(AuthSession).where(AuthSession.chain_id == session.chain_id, AuthSession.revoked_at.is_(None))
-                         .values(revoked_at=now))
-        await audit(db, category="security", action="refresh.reuse_detected", actor_id=session.user_id,
-                    outcome="denied", request=request)
+        await db.execute(
+            update(AuthSession)
+            .where(AuthSession.chain_id == session.chain_id, AuthSession.revoked_at.is_(None))
+            .values(revoked_at=now)
+        )
+        await audit(
+            db, category="security", action="refresh.reuse_detected", actor_id=session.user_id, outcome="denied", request=request
+        )
         await db.commit()
         raise ApiError(401, "invalid_refresh_token", "Session expired, please sign in again")
     if session.expires_at <= now:
@@ -231,12 +283,16 @@ async def refresh(request: Request, response: Response, body: RefreshIn | None =
 
 
 @router.post("/logout", status_code=204)
-async def logout(request: Request, response: Response, p: Principal = Depends(current_principal),
-                 db: AsyncSession = Depends(get_db)) -> Response:
+async def logout(
+    request: Request, response: Response, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> Response:
     session = await db.get(AuthSession, p.session_id)
     if session:
-        await db.execute(update(AuthSession).where(AuthSession.chain_id == session.chain_id, AuthSession.revoked_at.is_(None))
-                         .values(revoked_at=datetime.now(UTC)))
+        await db.execute(
+            update(AuthSession)
+            .where(AuthSession.chain_id == session.chain_id, AuthSession.revoked_at.is_(None))
+            .values(revoked_at=datetime.now(UTC))
+        )
     await audit(db, category="auth", action="logout", actor_id=p.id, actor_role=p.role, request=request)
     await db.commit()
     response = Response(status_code=204)
@@ -250,7 +306,9 @@ class MfaSetupOut(BaseModel):
 
 
 @router.post("/mfa/setup", response_model=MfaSetupOut)
-async def mfa_setup(request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)) -> MfaSetupOut:
+async def mfa_setup(
+    request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> MfaSetupOut:
     if p.user.totp_enabled:
         raise ApiError(409, "mfa_already_enabled", "Two-factor authentication is already enabled")
     secret = new_totp_secret()
@@ -261,8 +319,14 @@ async def mfa_setup(request: Request, p: Principal = Depends(current_principal),
 
 
 @router.post("/mfa/enable", response_model=TokenOut)
-async def mfa_enable(body: CodeIn, request: Request, response: Response, p: Principal = Depends(current_principal),
-                     db: AsyncSession = Depends(get_db), user_agent: str | None = Header(default=None)) -> TokenOut:
+async def mfa_enable(
+    body: CodeIn,
+    request: Request,
+    response: Response,
+    p: Principal = Depends(current_principal),
+    db: AsyncSession = Depends(get_db),
+    user_agent: str | None = Header(default=None),
+) -> TokenOut:
     if p.user.totp_enabled or not p.user.totp_secret_enc:
         raise ApiError(409, "mfa_not_pending", "Start two-factor setup first")
     if not _check_totp(p.user, body.code):
@@ -278,8 +342,9 @@ async def mfa_enable(body: CodeIn, request: Request, response: Response, p: Prin
 
 
 @router.post("/mfa/disable", status_code=204)
-async def mfa_disable(body: CodeIn, request: Request, p: Principal = Depends(current_principal),
-                      db: AsyncSession = Depends(get_db)) -> Response:
+async def mfa_disable(
+    body: CodeIn, request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> Response:
     if p.role in STAFF_ROLES and get_settings().require_admin_mfa:
         raise ApiError(403, "mfa_mandatory", "Two-factor authentication is mandatory for staff accounts")
     if not p.user.totp_enabled or not _check_totp(p.user, body.code):
@@ -293,8 +358,9 @@ async def mfa_disable(body: CodeIn, request: Request, p: Principal = Depends(cur
 
 
 @router.post("/password", status_code=204, dependencies=[Depends(_auth_rl)])
-async def change_password(body: PasswordChangeIn, request: Request, p: Principal = Depends(current_principal),
-                          db: AsyncSession = Depends(get_db)) -> Response:
+async def change_password(
+    body: PasswordChangeIn, request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> Response:
     if not verify_password(body.current_password, p.user.password_hash):
         await audit(db, category="security", action="password.change_failed", actor_id=p.id, outcome="denied", request=request)
         await db.commit()
@@ -304,8 +370,11 @@ async def change_password(body: PasswordChangeIn, request: Request, p: Principal
         raise ApiError(422, "weak_password", "Password " + "; ".join(problems), extra={"problems": problems})
     p.user.password_hash = hash_password(body.new_password)
     # Sign out every other session.
-    await db.execute(update(AuthSession).where(AuthSession.user_id == p.id, AuthSession.id != p.session_id,
-                                               AuthSession.revoked_at.is_(None)).values(revoked_at=datetime.now(UTC)))
+    await db.execute(
+        update(AuthSession)
+        .where(AuthSession.user_id == p.id, AuthSession.id != p.session_id, AuthSession.revoked_at.is_(None))
+        .values(revoked_at=datetime.now(UTC))
+    )
     await audit(db, category="auth", action="password.changed", actor_id=p.id, actor_role=p.role, request=request)
     await db.commit()
     return Response(status_code=204)

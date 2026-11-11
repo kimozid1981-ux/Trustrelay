@@ -55,6 +55,12 @@ def dec(analysis_id: uuid.UUID, field: str, blob: bytes | None, as_json: bool = 
     return json.loads(text) if as_json else text
 
 
+async def reload(db: AsyncSession, analysis_id: uuid.UUID) -> Analysis | None:
+    """Fetch an analysis with fresh column values and findings (bypasses stale identity-map state)."""
+    res = await db.execute(select(Analysis).where(Analysis.id == analysis_id).execution_options(populate_existing=True))
+    return res.scalar_one_or_none()
+
+
 async def disabled_modules(db: AsyncSession) -> set[str]:
     res = await db.execute(select(FeatureFlag).where(FeatureFlag.key.like("module.%")))
     return {f.key.removeprefix("module.") for f in res.scalars() if not f.enabled}
@@ -80,8 +86,13 @@ async def run_analysis(db: AsyncSession, analysis_id: uuid.UUID) -> None:
     deps = EngineDeps(**{**base.__dict__, "disabled_modules": await disabled_modules(db)})
     try:
         result = await analyse(
-            AnalysisInput(kind=a.kind, text=text, image_png=image, language=a.language,
-                          allow_ai=bool(prefs.allow_ai_processing) if prefs else True),
+            AnalysisInput(
+                kind=a.kind,
+                text=text,
+                image_png=image,
+                language=a.language,
+                allow_ai=bool(prefs.allow_ai_processing) if prefs else True,
+            ),
             deps,
             max_chars=get_settings().max_text_chars,
         )
@@ -95,25 +106,41 @@ async def run_analysis(db: AsyncSession, analysis_id: uuid.UUID) -> None:
 
     for i, f in enumerate(result.findings):
         fid = uuid.uuid4()
-        a.findings.append(Finding(
-            id=fid, position=i, module=f.module, code=f.code, severity=f.severity.value, confidence=f.confidence.value,
-            source=f.source, checked_at=f.checked_at, ai_generated=f.ai_generated,
-            details_enc=get_keyring().encrypt_text(json.dumps({"evidence": f.evidence, "params": f.params}, ensure_ascii=False),
-                                                   f"finding:{fid}".encode()),
-        ))
+        db.add(
+            Finding(
+                id=fid,
+                analysis_id=a.id,
+                position=i,
+                module=f.module,
+                code=f.code,
+                severity=f.severity.value,
+                confidence=f.confidence.value,
+                source=f.source,
+                checked_at=f.checked_at,
+                ai_generated=f.ai_generated,
+                details_enc=get_keyring().encrypt_text(
+                    json.dumps({"evidence": f.evidence, "params": f.params}, ensure_ascii=False), f"finding:{fid}".encode()
+                ),
+            )
+        )
     a.verdict = result.verdict.value
     a.confidence = result.confidence.value
     a.modules_run = result.modules_run
-    a.sources_checked = [{"source": s.source, "ok": s.ok, "checked_at": s.checked_at.isoformat(), "detail": s.detail}
-                         for s in result.sources]
+    a.sources_checked = [
+        {"source": s.source, "ok": s.ok, "checked_at": s.checked_at.isoformat(), "detail": s.detail} for s in result.sources
+    ]
     a.ai_used = result.ai_used
-    a.result_enc = enc(a.id, "result", {
-        "missing": result.missing,
-        "recommended_action": result.recommended_action,
-        "organisations": result.identified_organisations,
-        "domains": result.identified_domains,
-        "extracted": result.extracted,
-    })
+    a.result_enc = enc(
+        a.id,
+        "result",
+        {
+            "missing": result.missing,
+            "recommended_action": result.recommended_action,
+            "organisations": result.identified_organisations,
+            "domains": result.identified_domains,
+            "extracted": result.extracted,
+        },
+    )
     label = (result.identified_domains[:1] or result.identified_organisations[:1] or [None])[0]
     if label:
         a.label_enc = enc(a.id, "label", label)
@@ -131,8 +158,18 @@ async def run_analysis(db: AsyncSession, analysis_id: uuid.UUID) -> None:
 
     await _record_provider_health(db, result.sources)
     for r in result.ai_results:
-        db.add(AIUsage(provider=r.provider, model=r.model, input_tokens=r.input_tokens, output_tokens=r.output_tokens,
-                       cost_micro_eur=r.cost_micro_eur, latency_ms=r.latency_ms, success=r.ok, error_code=r.error))
+        db.add(
+            AIUsage(
+                provider=r.provider,
+                model=r.model,
+                input_tokens=r.input_tokens,
+                output_tokens=r.output_tokens,
+                cost_micro_eur=r.cost_micro_eur,
+                latency_ms=r.latency_ms,
+                success=r.ok,
+                error_code=r.error,
+            )
+        )
     await db.commit()
 
 
@@ -176,40 +213,44 @@ def render(a: Analysis, language: str, *, simple: bool = False, include_input: b
     for f in a.findings:
         details = json.loads(get_keyring().decrypt_text(f.details_enc, f"finding:{f.id}".encode()))
         texts = catalog.render_finding(f.code, f.source, details.get("params", {}), language)
-        findings.append({
-            "code": f.code,
-            "module": f.module,
-            "severity": f.severity,
-            "confidence": f.confidence,
-            "confidence_label": catalog.render_confidence(f.confidence, language),
-            "source": f.source,
-            "source_name": texts["source_name"],
-            "checked_at": f.checked_at.isoformat(),
-            "ai_generated": f.ai_generated,
-            "title": texts["title"],
-            "explanation": texts["detail"],
-            "evidence": details.get("evidence", []),
-            "limitation": texts["limitation"],
-        })
+        findings.append(
+            {
+                "code": f.code,
+                "module": f.module,
+                "severity": f.severity,
+                "confidence": f.confidence,
+                "confidence_label": catalog.render_confidence(f.confidence, language),
+                "source": f.source,
+                "source_name": texts["source_name"],
+                "checked_at": f.checked_at.isoformat(),
+                "ai_generated": f.ai_generated,
+                "title": texts["title"],
+                "explanation": texts["detail"],
+                "evidence": details.get("evidence", []),
+                "limitation": texts["limitation"],
+            }
+        )
     verdict = catalog.render_verdict(a.verdict or "insufficient_information", language, simple=simple)
     action_code = result.get("recommended_action", "action_verify_independently")
-    out.update({
-        "verdict": a.verdict,
-        "verdict_title": verdict["title"],
-        "verdict_summary": verdict["summary"],
-        "confidence": a.confidence,
-        "confidence_label": catalog.render_confidence(a.confidence or "low", language),
-        "recommended_action": {"code": action_code, "text": catalog.render_action(action_code, language)},
-        "identified_organisations": result.get("organisations", []),
-        "identified_domains": result.get("domains", []),
-        "findings": findings,
-        "missing_information": [{"code": m, "text": catalog.render_missing(m, language)} for m in result.get("missing", [])],
-        "sources_checked": a.sources_checked,
-        "modules_run": a.modules_run,
-        "ai_used": a.ai_used,
-        "extracted": result.get("extracted", {}),
-        "disclaimer": _DISCLAIMER[language],
-    })
+    out.update(
+        {
+            "verdict": a.verdict,
+            "verdict_title": verdict["title"],
+            "verdict_summary": verdict["summary"],
+            "confidence": a.confidence,
+            "confidence_label": catalog.render_confidence(a.confidence or "low", language),
+            "recommended_action": {"code": action_code, "text": catalog.render_action(action_code, language)},
+            "identified_organisations": result.get("organisations", []),
+            "identified_domains": result.get("domains", []),
+            "findings": findings,
+            "missing_information": [{"code": m, "text": catalog.render_missing(m, language)} for m in result.get("missing", [])],
+            "sources_checked": a.sources_checked,
+            "modules_run": a.modules_run,
+            "ai_used": a.ai_used,
+            "extracted": result.get("extracted", {}),
+            "disclaimer": _DISCLAIMER[language],
+        }
+    )
     return out
 
 

@@ -9,12 +9,12 @@ from app.providers.ai.base import AIProvider
 from app.providers.ai.providers import AnthropicProvider, MockAIProvider, NullAIProvider
 from app.providers.threat_intel.base import DomainAgeProvider, ReputationProvider
 from app.providers.threat_intel.providers import (
-    URLhaus,
     GoogleSafeBrowsing,
     LocalBlocklist,
     MockDomainAge,
     MockReputation,
     RDAPDomainAge,
+    URLhaus,
 )
 
 

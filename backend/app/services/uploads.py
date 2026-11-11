@@ -24,7 +24,6 @@ def sanitize_image(data: bytes, *, max_bytes: int, max_pixels: int) -> tuple[byt
         raise UploadRejected("file_too_large")
     if not data.startswith(_MAGIC) or (data.startswith(b"RIFF") and data[8:12] != b"WEBP"):
         raise UploadRejected("unsupported_type")
-    Image.MAX_IMAGE_PIXELS = max_pixels
     try:
         with Image.open(io.BytesIO(data)) as img:
             if img.format not in ALLOWED_FORMATS:

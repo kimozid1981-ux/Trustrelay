@@ -69,9 +69,7 @@ async def resolve_public(host: str, port: int) -> str:
     except ValueError:
         loop = asyncio.get_running_loop()
         try:
-            infos = await asyncio.wait_for(
-                loop.getaddrinfo(host, port, type=socket.SOCK_STREAM), timeout=3.0
-            )
+            infos = await asyncio.wait_for(loop.getaddrinfo(host, port, type=socket.SOCK_STREAM), timeout=3.0)
         except (TimeoutError, socket.gaierror) as exc:
             raise BlockedDestination("dns_failure") from exc
         candidates = list(dict.fromkeys(str(i[4][0]) for i in infos))
@@ -208,9 +206,7 @@ async def fetch_certificate(host: str, timeout: float) -> CertInfo:
         return CertInfo(valid=False, error=exc.reason)
     ctx = ssl.create_default_context()
     try:
-        reader, writer = await asyncio.wait_for(
-            asyncio.open_connection(ip, 443, ssl=ctx, server_hostname=host), timeout=timeout
-        )
+        reader, writer = await asyncio.wait_for(asyncio.open_connection(ip, 443, ssl=ctx, server_hostname=host), timeout=timeout)
     except ssl.SSLCertVerificationError as exc:
         return CertInfo(valid=False, error=f"cert_verify:{exc.verify_code}")
     except (OSError, TimeoutError, ssl.SSLError) as exc:

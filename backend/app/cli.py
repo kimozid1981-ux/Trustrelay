@@ -1,8 +1,8 @@
 """Operator commands.
 
-  python -m app.cli create-staff --email admin@example.org --role admin   (password read from stdin / prompt)
-  python -m app.cli purge
-  python -m app.cli export-openapi path.json
+python -m app.cli create-staff --email admin@example.org --role admin   (password read from stdin / prompt)
+python -m app.cli purge
+python -m app.cli export-openapi path.json
 """
 
 from __future__ import annotations

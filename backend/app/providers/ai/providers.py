@@ -111,14 +111,30 @@ class AnthropicProvider(AIProvider):
         pin, pout = _PRICES_EUR_PER_MTOK.get(self.model, (5.0, 25.0))
         cost = int(in_tok * pin + out_tok * pout)  # micro-EUR (EUR/Mtok * tokens = micro-EUR)
         if resp.stop_reason == "refusal":
-            return AIResult(self.name, self.model, False, error="refusal", input_tokens=in_tok,
-                            output_tokens=out_tok, cost_micro_eur=cost, latency_ms=latency)
+            return AIResult(
+                self.name,
+                self.model,
+                False,
+                error="refusal",
+                input_tokens=in_tok,
+                output_tokens=out_tok,
+                cost_micro_eur=cost,
+                latency_ms=latency,
+            )
         raw = next((b.text for b in resp.content if b.type == "text"), "")
         try:
             json.loads(raw)
         except ValueError:
-            return AIResult(self.name, self.model, False, error="invalid_json", input_tokens=in_tok,
-                            output_tokens=out_tok, cost_micro_eur=cost, latency_ms=latency)
+            return AIResult(
+                self.name,
+                self.model,
+                False,
+                error="invalid_json",
+                input_tokens=in_tok,
+                output_tokens=out_tok,
+                cost_micro_eur=cost,
+                latency_ms=latency,
+            )
         # Evidence must appear in the user's text or in the OCR text the model itself produced for an image.
         extracted, org, signals, dropped = sanitize_ai_output(raw, text or "")
         return AIResult(

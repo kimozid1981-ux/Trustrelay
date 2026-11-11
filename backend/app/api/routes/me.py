@@ -56,7 +56,9 @@ def _profile(p: Principal) -> dict:
             "notify_family_warnings": prefs.notify_family_warnings,
             "product_analytics_opt_in": prefs.product_analytics_opt_in,
             "allow_ai_processing": prefs.allow_ai_processing,
-        } if prefs else None,
+        }
+        if prefs
+        else None,
     }
 
 
@@ -93,8 +95,9 @@ class PrefsPatch(BaseModel):
 
 
 @router.patch("/preferences")
-async def update_prefs(body: PrefsPatch, request: Request, p: Principal = Depends(current_principal),
-                       db: AsyncSession = Depends(get_db)) -> dict:
+async def update_prefs(
+    body: PrefsPatch, request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> dict:
     prefs = p.user.preferences
     changes = body.model_dump(exclude_none=True)
     for k, v in changes.items():
@@ -109,24 +112,48 @@ async def update_prefs(body: PrefsPatch, request: Request, p: Principal = Depend
             .where(Analysis.user_id == p.id, Analysis.expires_at > Analysis.created_at + timedelta(days=days))
             .values(expires_at=Analysis.created_at + timedelta(days=days))
         )
-    await audit(db, category="data", action="preferences.update", actor_id=p.id, actor_role=p.role, request=request,
-                details={"fields": sorted(changes)})
+    await audit(
+        db,
+        category="data",
+        action="preferences.update",
+        actor_id=p.id,
+        actor_role=p.role,
+        request=request,
+        details={"fields": sorted(changes)},
+    )
     await db.commit()
     return _profile(p)["preferences"]
 
 
 @router.get("/sessions")
 async def sessions(p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)) -> list[dict]:
-    rows = (await db.execute(select(AuthSession).where(AuthSession.user_id == p.id, AuthSession.revoked_at.is_(None),
-                                                       AuthSession.expires_at > datetime.now(UTC))
-                             .order_by(AuthSession.created_at.desc()))).scalars().all()
-    return [{"id": str(s.id), "client": s.client, "user_agent": s.user_agent, "created_at": s.created_at.isoformat(),
-             "current": s.id == p.session_id} for s in rows]
+    rows = (
+        (
+            await db.execute(
+                select(AuthSession)
+                .where(AuthSession.user_id == p.id, AuthSession.revoked_at.is_(None), AuthSession.expires_at > datetime.now(UTC))
+                .order_by(AuthSession.created_at.desc())
+            )
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        {
+            "id": str(s.id),
+            "client": s.client,
+            "user_agent": s.user_agent,
+            "created_at": s.created_at.isoformat(),
+            "current": s.id == p.session_id,
+        }
+        for s in rows
+    ]
 
 
 @router.delete("/sessions/{session_id}", status_code=204)
-async def revoke_session(session_id: uuid.UUID, p: Principal = Depends(current_principal),
-                         db: AsyncSession = Depends(get_db)) -> Response:
+async def revoke_session(
+    session_id: uuid.UUID, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> Response:
     s = await db.get(AuthSession, session_id)
     if s is None or s.user_id != p.id:
         raise ApiError(404, "not_found", "Session not found")
@@ -136,8 +163,9 @@ async def revoke_session(session_id: uuid.UUID, p: Principal = Depends(current_p
 
 
 @router.get("/export")
-async def export_data(request: Request, p: Principal = Depends(current_principal), lang: str = Depends(language),
-                      db: AsyncSession = Depends(get_db)) -> Response:
+async def export_data(
+    request: Request, p: Principal = Depends(current_principal), lang: str = Depends(language), db: AsyncSession = Depends(get_db)
+) -> Response:
     """Everything we hold about the user, decrypted, as one JSON document (portable format)."""
     analyses = (await db.execute(select(Analysis).where(Analysis.user_id == p.id).order_by(Analysis.created_at))).scalars().all()
     member = (await db.execute(select(FamilyMember).where(FamilyMember.user_id == p.id))).scalar_one_or_none()
@@ -148,26 +176,63 @@ async def export_data(request: Request, p: Principal = Depends(current_principal
     sessions_ = (await db.execute(select(AuthSession).where(AuthSession.user_id == p.id))).scalars().all()
     usage_rows = (await db.execute(select(UsageCounter).where(UsageCounter.user_id == p.id))).scalars().all()
     uploads = (await db.execute(select(Upload).where(Upload.user_id == p.id))).scalars().all()
-    logs = (await db.execute(select(AuditLog).where(AuditLog.actor_user_id == p.id).order_by(AuditLog.occurred_at))).scalars().all()
+    logs = (
+        (await db.execute(select(AuditLog).where(AuditLog.actor_user_id == p.id).order_by(AuditLog.occurred_at))).scalars().all()
+    )
     kr = get_keyring()
     doc = {
         "format": "trustrelay-export-v1",
         "generated_at": datetime.now(UTC).isoformat(),
         "profile": _profile(p),
         "analyses": [svc.render(a, lang) for a in analyses],
-        "family": {"group_name": group.name, "role": member.role, "age_band": member.age_band,
-                   "receive_warnings": member.receive_warnings, "can_share_warnings": member.can_share_warnings}
-        if member and group else None,
-        "warnings_shared": [{"id": str(w.id), "kind": w.kind, "verdict": w.verdict, "created_at": w.created_at.isoformat(),
-                             "message": kr.decrypt_text(w.message_enc, f"warning:{w.id}".encode()) if w.message_enc else None}
-                            for w in warnings],
-        "support_tickets": [{"id": str(t.id), "category": t.category, "status": t.status, "created_at": t.created_at.isoformat(),
-                             "subject": kr.decrypt_text(t.subject_enc, f"ticket:{t.id}:subject".encode()),
-                             "body": kr.decrypt_text(t.body_enc, f"ticket:{t.id}:body".encode())} for t in tickets],
-        "support_access_grants": [{"analysis_id": str(g.analysis_id), "created_at": g.created_at.isoformat(),
-                                   "expires_at": g.expires_at.isoformat(), "revoked": g.revoked_at is not None} for g in grants],
-        "sessions": [{"client": s.client, "user_agent": s.user_agent, "created_at": s.created_at.isoformat(),
-                      "revoked": s.revoked_at is not None} for s in sessions_],
+        "family": {
+            "group_name": group.name,
+            "role": member.role,
+            "age_band": member.age_band,
+            "receive_warnings": member.receive_warnings,
+            "can_share_warnings": member.can_share_warnings,
+        }
+        if member and group
+        else None,
+        "warnings_shared": [
+            {
+                "id": str(w.id),
+                "kind": w.kind,
+                "verdict": w.verdict,
+                "created_at": w.created_at.isoformat(),
+                "message": kr.decrypt_text(w.message_enc, f"warning:{w.id}".encode()) if w.message_enc else None,
+            }
+            for w in warnings
+        ],
+        "support_tickets": [
+            {
+                "id": str(t.id),
+                "category": t.category,
+                "status": t.status,
+                "created_at": t.created_at.isoformat(),
+                "subject": kr.decrypt_text(t.subject_enc, f"ticket:{t.id}:subject".encode()),
+                "body": kr.decrypt_text(t.body_enc, f"ticket:{t.id}:body".encode()),
+            }
+            for t in tickets
+        ],
+        "support_access_grants": [
+            {
+                "analysis_id": str(g.analysis_id),
+                "created_at": g.created_at.isoformat(),
+                "expires_at": g.expires_at.isoformat(),
+                "revoked": g.revoked_at is not None,
+            }
+            for g in grants
+        ],
+        "sessions": [
+            {
+                "client": s.client,
+                "user_agent": s.user_agent,
+                "created_at": s.created_at.isoformat(),
+                "revoked": s.revoked_at is not None,
+            }
+            for s in sessions_
+        ],
         "usage": [{"period": u.period, "checks": u.checks} for u in usage_rows],
         "uploads": [{"id": str(u.id), "size_bytes": u.size_bytes, "created_at": u.created_at.isoformat()} for u in uploads],
         "activity_log": [{"at": log.occurred_at.isoformat(), "action": log.action, "outcome": log.outcome} for log in logs],
@@ -187,14 +252,17 @@ class DeleteAccountIn(BaseModel):
 
 
 @router.post("/delete", status_code=204)
-async def delete_account(body: DeleteAccountIn, request: Request, p: Principal = Depends(current_principal),
-                         db: AsyncSession = Depends(get_db)) -> Response:
+async def delete_account(
+    body: DeleteAccountIn, request: Request, p: Principal = Depends(current_principal), db: AsyncSession = Depends(get_db)
+) -> Response:
     if not verify_password(body.password, p.user.password_hash):
         raise ApiError(401, "invalid_credentials", "Password is incorrect")
     owned = (await db.execute(select(FamilyGroup).where(FamilyGroup.owner_id == p.id))).scalars().all()
     for g in owned:
         others = [m for m in g.members if m.user_id != p.id]
-        successor = next((m for m in others if m.role == "guardian"), None) or next((m for m in others if m.age_band in ("adult", "senior")), None)
+        successor = next((m for m in others if m.role == "guardian"), None) or next(
+            (m for m in others if m.age_band in ("adult", "senior")), None
+        )
         if successor:
             g.owner_id = successor.user_id
             successor.role = "owner"
