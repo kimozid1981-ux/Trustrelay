@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+backend/var/
+*.egg-info/
+# Env files — never commit secrets
+.env
+.env.*
+!.env.example
+# Node
+node_modules/
+.next/
+web/out/
+web/test-results/
+web/playwright-report/
+# Flutter
+mobile/.dart_tool/
+mobile/build/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/ios/Pods/
+mobile/android/.gradle/
+mobile/android/local.properties
+# OS
+.DS_Store
