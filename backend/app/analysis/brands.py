@@ -56,7 +56,7 @@ BRANDS: tuple[Brand, ...] = (
     Brand(
         "servicepublic",
         "Service-Public.fr",
-        ("service-public.fr", "gouv.fr"),
+        ("service-public.gouv.fr", "service-public.fr", "gouv.fr"),
         ("service public", "service-public"),
         category="public",
     ),

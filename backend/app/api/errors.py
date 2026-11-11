@@ -49,8 +49,10 @@ def install(app: FastAPI) -> None:
     async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:
         # Only field locations and messages; never echo the submitted values back.
         errors = [{"loc": list(e.get("loc", [])), "msg": e.get("msg", ""), "type": e.get("type", "")} for e in exc.errors()]
+        fields = sorted({str(e["loc"][-1]) for e in errors if e["loc"] and e["loc"][0] == "body" and len(e["loc"]) > 1})
+        detail = "The request is invalid" + (f" (check: {', '.join(fields)})" if fields else "")
         return JSONResponse(
-            _problem(request, 422, "validation_error", "The request is invalid", errors=errors),
+            _problem(request, 422, "validation_error", detail, errors=errors),
             status_code=422,
             media_type="application/problem+json",
         )

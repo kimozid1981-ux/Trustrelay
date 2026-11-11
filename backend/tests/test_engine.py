@@ -351,3 +351,17 @@ def test_every_finding_code_has_fr_and_en_text() -> None:
     for v in catalog.VERDICTS.values():
         for t in v:
             assert "100" not in t and " sûr " not in f" {t.lower()} "
+
+
+async def test_link_with_unrecognised_tld_is_still_checked() -> None:
+    # A link must not become invisible because its ending is missing from the offline suffix list.
+    r = await run("message", "Mettez à jour votre carte Vitale : https://ameli-remboursement.test-phish/maj")
+    codes = {f.code for f in r.findings}
+    assert "url_unrecognised_tld" in codes
+    assert r.verdict.value == "known_malicious"  # the mock reputation source lists *.test-phish
+
+
+def test_zero_width_characters_do_not_hide_links() -> None:
+    from app.analysis.extract import extract_urls
+
+    assert extract_urls("go to https://exa​mple.com/x now") == ["https://example.com/x"]

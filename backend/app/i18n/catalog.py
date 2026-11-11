@@ -49,6 +49,12 @@ FINDINGS: dict[str, tuple[str, str, str, str]] = {
         "C'est un lien raccourci",
         "Un lien raccourci masque la destination finale. Seul le raccourcisseur a pu être vérifié si la redirection n'a pas été suivie.",
     ),
+    "url_unrecognised_tld": (
+        "The domain ending ({tld}) is not a recognised Internet extension",
+        "It may be very new, or the address may not work at all; our offline list of extensions can lag behind.",
+        "L'extension du domaine ({tld}) n'est pas une extension Internet reconnue",
+        "Elle est peut-être très récente, ou l'adresse ne fonctionne pas ; notre liste hors ligne peut être en retard.",
+    ),
     "url_high_abuse_tld": (
         "The domain ending ({tld}) is often used in scams",
         "Many legitimate sites use it too; on its own this is a weak signal.",
@@ -405,6 +411,10 @@ LIMITATIONS: dict[str, tuple[str, str]] = {
         "Pattern-based check: it can miss new wording and can flag legitimate messages that use similar words.",
         "Vérification par motifs : elle peut manquer de nouvelles formulations et signaler des messages légitimes au vocabulaire proche.",
     ),
+    "url_rules": (
+        "Based only on how the address is written; it does not tell us who runs the site.",
+        "Basé uniquement sur l'écriture de l'adresse ; cela ne dit pas qui exploite le site.",
+    ),
     "brand_registry": (
         "Based on our hand-maintained list of official domains, which is not exhaustive.",
         "Basé sur notre liste, tenue à la main, des domaines officiels ; elle n'est pas exhaustive.",
@@ -575,6 +585,8 @@ def source_family(source: str) -> str:
         return "brand_registry"
     if source.startswith("rules:iban"):
         return "iban"
+    if source == "rules:website":
+        return "url_rules"
     if source.startswith("rules"):
         return "rules"
     if source.startswith("ai:"):

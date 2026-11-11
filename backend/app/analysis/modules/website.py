@@ -113,6 +113,10 @@ def structural_findings(p: ParsedURL) -> list[Finding]:
     if p.registrable in URL_SHORTENERS:
         out.append(Finding(MODULE, "url_shortener", Severity.INFO, Confidence.HIGH, "rules:website", ev))
     tld = p.suffix.rsplit(".", 1)[-1]
+    if p.unknown_suffix:
+        out.append(
+            Finding(MODULE, "url_unrecognised_tld", Severity.MODERATE, Confidence.LOW, "rules:website", ev, {"tld": "." + tld})
+        )
     if tld in HIGH_ABUSE_TLDS:
         out.append(
             Finding(MODULE, "url_high_abuse_tld", Severity.MODERATE, Confidence.LOW, "rules:website", ev, {"tld": "." + tld})

@@ -83,7 +83,7 @@ async def test_tokens_are_rejected_when_tampered_or_missing(client) -> None:  # 
     assert (await client.get("/api/v1/me", headers={"Authorization": f"Bearer {bad}"})).status_code == 401
     import jwt as pyjwt
 
-    forged = pyjwt.encode({"sub": "x", "role": "admin"}, "wrong-secret", algorithm="HS256")
+    forged = pyjwt.encode({"sub": "x", "role": "admin"}, "wrong-secret-that-is-long-enough-for-hs256!", algorithm="HS256")
     assert (await client.get("/api/v1/me", headers={"Authorization": f"Bearer {forged}"})).status_code == 401
 
 

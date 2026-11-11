@@ -95,12 +95,14 @@ class ParsedURL:
     path: str
     has_userinfo: bool
     is_ip: bool
+    unknown_suffix: bool = False  # ending not in the bundled public-suffix list (new or invalid TLD)
 
 
 def parse_url(raw: str) -> ParsedURL | None:
     raw = raw.strip().rstrip(_TRAILING)
     if not raw:
         return None
+    explicit_web_scheme = bool(re.match(r"(?i)^https?://", raw))
     if not re.match(r"(?i)^[a-z][a-z0-9+.-]*://", raw):
         raw = "http://" + raw if raw.lower().startswith("www.") or "/" in raw or "." in raw else raw
     try:
@@ -135,21 +137,30 @@ def parse_url(raw: str) -> ParsedURL | None:
     except UnicodeError:
         host_unicode = host
     ext = _tld(host_ascii)
-    if not ext.suffix or not ext.domain:
-        return None
-    registrable = f"{ext.domain}.{ext.suffix}"
+    unknown_suffix = False
+    subdomain, domain, suffix = ext.subdomain, ext.domain, ext.suffix
+    if not suffix or not domain:
+        # An explicit http(s):// link is kept even when its ending is unknown to the offline list (a new TLD
+        # must not make a scam link invisible); bare words such as "file.name" are still ignored.
+        labels = host_ascii.split(".")
+        if not explicit_web_scheme or len(labels) < 2 or not all(labels) or not re.fullmatch(r"[a-z][a-z0-9-]{1,62}", labels[-1]):
+            return None
+        unknown_suffix = True
+        suffix, domain, subdomain = labels[-1], labels[-2], ".".join(labels[:-2])
+    registrable = f"{domain}.{suffix}"
     return ParsedURL(
         url=raw,
         scheme=parts.scheme.lower(),
         host=host_unicode,
         host_ascii=host_ascii,
         registrable=registrable,
-        subdomain=ext.subdomain,
-        suffix=ext.suffix,
+        subdomain=subdomain,
+        suffix=suffix,
         port=port,
         path=parts.path or "/",
         has_userinfo=has_userinfo,
         is_ip=False,
+        unknown_suffix=unknown_suffix,
     )
 
 
