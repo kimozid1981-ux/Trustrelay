@@ -1,6 +1,6 @@
 # 01 — System and component architecture
 
-Status: **IN PROGRESS** (Phase 1). This document is the reference design; where the code differs, the code
+Status: **TESTING** (Phase 1, awaiting owner review). This document is the reference design; where the code differs, the code
 and `docs/STATUS.md` say what is actually built.
 
 ## 1. Goals that drive the architecture

@@ -112,6 +112,8 @@ class Settings(BaseSettings):
             problems.append("TR_REDIS_URL is required outside development")
         if not self.web_refresh_cookie_secure:
             problems.append("TR_WEB_REFRESH_COOKIE_SECURE must be true outside development")
+        if any(o.strip() == "*" for o in self.cors_origins):
+            problems.append("TR_CORS_ORIGINS must list explicit origins outside development")
         if self.threat_intel_mock or self.ai_provider == "mock":
             problems.append("mock providers are not allowed outside development")
         if problems:
