@@ -1,0 +1,23 @@
+# Local development services only. NOT for production. Not verified in the Phase 1 build environment (no Docker).
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: trustrelay
+      POSTGRES_PASSWORD: trustrelay   # development only
+      POSTGRES_DB: trustrelay
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+  redis:
+    image: redis:7-alpine
+    ports: ["127.0.0.1:6379:6379"]
+  api:
+    build: ./backend
+    profiles: [full]
+    env_file: ./backend/.env
+    environment:
+      TR_DATABASE_URL: postgresql+asyncpg://trustrelay:trustrelay@db:5432/trustrelay
+    ports: ["127.0.0.1:8000:8000"]
+    depends_on: [db]
+volumes:
+  pgdata:
