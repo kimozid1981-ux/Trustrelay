@@ -31,19 +31,11 @@ from app.db.models import (
     User,
 )
 from app.db.session import get_db
+from app.services.flags import DEFAULT_FLAGS
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 admin = require_roles("admin")
 admin_or_security = require_roles("admin", "security")
-
-DEFAULT_FLAGS = {
-    "module.website": (True, "Website / URL analysis module"),
-    "module.message": (True, "Message analysis module"),
-    "module.advert": (True, "Advertisement analysis module"),
-    "module.payment": (True, "Payment request analysis module"),
-    "family_protection": (True, "Family groups and shared warnings"),
-    "public_link_checker": (False, "Anonymous website checker on the public site (Phase 5)"),
-}
 
 
 @router.get("/stats")

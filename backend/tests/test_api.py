@@ -476,3 +476,28 @@ async def test_unsafe_production_config_refuses_to_start(monkeypatch) -> None:  
     s = Settings(environment="production")
     with pytest.raises(RuntimeError, match="Unsafe configuration"):
         s.validate_for_environment()
+
+
+async def test_family_flag_disables_family_features(client) -> None:  # type: ignore[no-untyped-def]
+    admin = await make_staff(client, "fflag@example.org")
+    u = await register(client, "fflagu@example.org")
+    assert (await client.get("/api/v1/family", headers=auth(u))).status_code == 200
+    await client.put("/api/v1/admin/feature-flags/family_protection", json={"enabled": False}, headers=auth(admin))
+    r = await client.get("/api/v1/family", headers=auth(u))
+    assert r.status_code == 404 and r.json()["code"] == "feature_disabled"
+
+
+async def test_ai_budget_cap_is_enforced(client, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    from app.db.models import AIUsage
+    from app.services.analysis_service import ai_budget_exhausted
+
+    monkeypatch.setattr(get_settings(), "ai_monthly_budget_eur", 1.0)
+    async with get_sessionmaker()() as db:
+        assert not await ai_budget_exhausted(db)
+        db.add(
+            AIUsage(
+                provider="mock", model="m", input_tokens=1, output_tokens=1, cost_micro_eur=1_000_000, latency_ms=1, success=True
+            )
+        )
+        await db.commit()
+        assert await ai_budget_exhausted(db)

@@ -19,6 +19,7 @@ from app.core.storage import put_encrypted
 from app.db.models import Analysis, FamilyMember, SharedWarning, SupportAccessGrant, Upload, UsageCounter
 from app.db.session import get_db
 from app.services import analysis_service as svc
+from app.services.flags import is_enabled
 from app.services.uploads import UploadRejected, sanitize_image
 
 router = APIRouter(tags=["analyses"])
@@ -294,6 +295,8 @@ async def share_with_family(
 ) -> dict:
     if not body.confirm:
         raise ApiError(422, "confirmation_required", "Sharing requires your explicit confirmation")
+    if not await is_enabled(db, "family_protection"):
+        raise ApiError(404, "feature_disabled", "Family protection is currently unavailable")
     a = await _own(db, p, analysis_id)
     if a.status != "completed":
         raise ApiError(409, "not_completed", "The analysis is not finished")

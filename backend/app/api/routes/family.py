@@ -25,8 +25,15 @@ from app.core.security import hash_refresh_token
 from app.db.models import FamilyGroup, FamilyInvite, FamilyMember, SharedWarning, User
 from app.db.session import get_db
 from app.i18n import catalog
+from app.services.flags import is_enabled
 
-router = APIRouter(prefix="/family", tags=["family"])
+
+async def _family_enabled(db: AsyncSession = Depends(get_db)) -> None:
+    if not await is_enabled(db, "family_protection"):
+        raise ApiError(404, "feature_disabled", "Family protection is currently unavailable")
+
+
+router = APIRouter(prefix="/family", tags=["family"], dependencies=[Depends(_family_enabled)])
 _join_rl = rate_limit("family_join", lambda: 10)
 
 AgeBand = Literal["child", "teen", "adult", "senior"]

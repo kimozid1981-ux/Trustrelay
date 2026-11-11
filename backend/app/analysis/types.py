@@ -70,7 +70,7 @@ class AnalysisInput:
     text: str | None = None
     image_png: bytes | None = None
     language: str = "fr"
-    allow_ai: bool = True
+    allow_ai: bool = False  # opt-in; callers pass the user preference
 
 
 @dataclass

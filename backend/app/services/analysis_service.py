@@ -8,7 +8,7 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.analysis.deps import EngineDeps, build_deps
@@ -66,6 +66,14 @@ async def disabled_modules(db: AsyncSession) -> set[str]:
     return {f.key.removeprefix("module.") for f in res.scalars() if not f.enabled}
 
 
+async def ai_budget_exhausted(db: AsyncSession) -> bool:
+    """True when this calendar month's estimated AI spend reached TR_AI_MONTHLY_BUDGET_EUR."""
+    budget = get_settings().ai_monthly_budget_eur
+    start = datetime.now(UTC).replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    spent_micro = await db.scalar(select(func.coalesce(func.sum(AIUsage.cost_micro_eur), 0)).where(AIUsage.occurred_at >= start))
+    return (spent_micro or 0) >= budget * 1_000_000
+
+
 async def run_analysis(db: AsyncSession, analysis_id: uuid.UUID) -> None:
     a = await db.get(Analysis, analysis_id)
     if a is None or a.status not in ("queued", "processing"):
@@ -83,7 +91,10 @@ async def run_analysis(db: AsyncSession, analysis_id: uuid.UUID) -> None:
         if upload:
             image = await get_decrypted(upload.storage_key)
     base = get_engine_deps()
-    deps = EngineDeps(**{**base.__dict__, "disabled_modules": await disabled_modules(db)})
+    disabled = await disabled_modules(db)
+    if await ai_budget_exhausted(db):
+        disabled = disabled | {"ai"}
+    deps = EngineDeps(**{**base.__dict__, "disabled_modules": disabled})
     try:
         result = await analyse(
             AnalysisInput(
@@ -91,7 +102,8 @@ async def run_analysis(db: AsyncSession, analysis_id: uuid.UUID) -> None:
                 text=text,
                 image_png=image,
                 language=a.language,
-                allow_ai=bool(prefs.allow_ai_processing) if prefs else True,
+                # AI is opt-in, and is skipped when an admin disabled it or the monthly budget is spent.
+                allow_ai=bool(prefs and prefs.allow_ai_processing) and "ai" not in deps.disabled_modules,
             ),
             deps,
             max_chars=get_settings().max_text_chars,

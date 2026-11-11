@@ -196,13 +196,15 @@ async def test_ai_cannot_escalate_alone_or_downgrade() -> None:
             "signals": [{"code": "ai_too_good_to_be_true", "evidence_quote": "Offre spéciale pour vous", "confidence": "high"}],
         }
     )
-    r = await analyse(AnalysisInput(kind="message", text=text), deps(ai=ai))
+    r = await analyse(AnalysisInput(kind="message", text=text, allow_ai=True), deps(ai=ai))
     ai_findings = [f for f in r.findings if f.ai_generated]
     assert ai_findings and all(f.severity.value == "moderate" for f in ai_findings)
     assert r.verdict.value == "moderate_warning"  # AI alone can never reach strong/known malicious
 
     # and an AI provider cannot remove a known-malicious listing
-    r2 = await analyse(AnalysisInput(kind="message", text="Voir http://malicious-test.example.com " + text), deps(ai=ai))
+    r2 = await analyse(
+        AnalysisInput(kind="message", text="Voir http://malicious-test.example.com " + text, allow_ai=True), deps(ai=ai)
+    )
     assert r2.verdict.value == "known_malicious"
 
 
@@ -220,7 +222,7 @@ async def test_ai_disabled_by_user_preference_is_respected() -> None:
 
 async def test_image_ocr_via_ai_runs_rules_on_extracted_text() -> None:
     ai = MockAIProvider(ocr_text="Colissimo : payez 2,99 € de frais de livraison sous 24h sur colissimo-suivi.top")
-    r = await analyse(AnalysisInput(kind="image", image_png=b"png"), deps(ai=ai))
+    r = await analyse(AnalysisInput(kind="image", image_png=b"png", allow_ai=True), deps(ai=ai))
     assert r.ai_used
     assert r.extracted["text_origin"] == "ai_ocr"
     assert r.verdict.value == "strong_suspicious"
